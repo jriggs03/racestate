@@ -4,7 +4,19 @@ A readable race-intelligence system, built one working slice at a time.
 RaceState is the working project name; RaceSignal remains a possible public name.
 This is an independent learning project, with no official F1 affiliation.
 
-## What works today
+## Phase 1: real-data ingestion
+
+The current direction is Python OpenF1 ingestion → normalized typed events →
+durable local event log → future Java coordinator. Raw data archives to local
+files or S3 through a separate command. Java owns future distributed processing;
+Postgres and DuckDB come later. No new workers are built in this phase.
+
+See [the phase 1 guide](docs/phase-1-ingestion.md) for commands, configuration,
+contracts, failure behavior and a line-by-line reading path. The historical
+simulation roadmap below is retained for context; the phase 1 guide supersedes
+its language and database sequencing decisions.
+
+## Simulation demo
 
 Four fictional cars produce telemetry at 10 Hz. A bounded queue feeds one Python
 worker thread, which updates an in-memory race state. A local HTTP API serves a

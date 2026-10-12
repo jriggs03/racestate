@@ -1,3 +1,7 @@
+> Current direction: [Phase 1 ingestion](phase-1-ingestion.md) supersedes
+> the future Python coordinator and early Postgres plan below. Python ingests;
+> Java will coordinate. The milestone 0 simulation remains supported.
+
 # Architecture
 
 ## Milestone 0: the executable slice
