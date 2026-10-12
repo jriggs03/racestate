@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RaceState · Simulation</title><link rel="stylesheet" href="/style.css"></head>
+<body><header><strong>RaceState</strong><span>SIMULATED SESSION · FICTIONAL CARS</span><p id="status" role="status">Connecting…</p></header>
+<main><section><h1>Race order</h1><table><thead><tr><th>Pos</th><th>Car</th><th>Lap progress</th></tr></thead><tbody id="standings"></tbody></table></section>
+<section><h2>Track positions</h2><p>Schematic oval · normalized coordinates</p><svg viewBox="-1.3 -0.9 2.6 1.8" role="img" aria-label="Live simulated car positions"><ellipse cx="0" cy="0" rx="1" ry="0.6"/><g id="cars"></g></svg></section>
+<section><h2>Driver telemetry</h2><label for="driver">Selected car</label> <select id="driver"></select><dl id="telemetry"></dl></section></main>
+<script src="/app.js"></script></body></html>
