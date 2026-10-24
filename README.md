@@ -1,6 +1,8 @@
 # RaceState
 
-A readable race-intelligence system, built one working slice at a time.
+Collects F1 events with durable storage and replay.
+
+Independent project by James Riggs. Built with Python, SQLite, and a small browser UI.
 RaceState is the working project name; RaceSignal remains a possible public name.
 This is an independent learning project, with no official F1 affiliation.
 
@@ -24,8 +26,9 @@ small responsive website with standings, a schematic oval, and selected-car
 speed, throttle, brake and gear. The website polls at up to 5 Hz and remembers
 its selected car. Everything is clearly labeled as simulated.
 
-**This is milestone 0, not the distributed MVP.** State disappears on restart.
-There is no Postgres, real feed, worker recovery, historical analytics or deployment yet.
+**The browser demo is simulated.** Its in-memory state disappears on restart.
+The separate OpenF1 ingestion path uses a durable SQLite log; see the phase 1 guide.
+Java coordinator/workers, Postgres, and a live race dashboard remain future work.
 
 ## Run on macOS
 
