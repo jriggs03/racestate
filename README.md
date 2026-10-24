@@ -3,37 +3,46 @@
 Collects F1 events with durable storage and replay.
 
 Independent project by James Riggs. Built with Python, SQLite, and a small browser UI.
-RaceState is the working project name; RaceSignal remains a possible public name.
-This is an independent learning project, with no official F1 affiliation.
+This is an independent learning project with no official F1 affiliation.
+
+## Current implementation
+
+RaceState currently has two working pieces:
+
+- A real-data ingestion path that fetches historical OpenF1 car and position data, validates and normalizes records, and writes them to a durable SQLite event log.
+- A separate simulated browser demo that shows fictional telemetry through a small local API and UI.
+
+The ingestion path uses deterministic event IDs for deduplication, monotonically increasing log offsets for replay, SQLite WAL mode for durable local commits, and an outbox for raw-response archival to local files or Amazon S3. Automated tests cover reopen behavior, rollback, deduplication, abrupt exit after commit, and failed archive retry.
+
+**Not implemented yet:** the Java coordinator/workers, Postgres state store, DuckDB analytics layer, and distributed worker fault recovery. Those are future phases of the project.
 
 ## Phase 1: real-data ingestion
 
-The current direction is Python OpenF1 ingestion → normalized typed events →
-durable local event log → future Java coordinator. Raw data archives to local
-files or S3 through a separate command. Java owns future distributed processing;
-Postgres and DuckDB come later. No new workers are built in this phase.
+The current architecture is:
 
-See [the phase 1 guide](docs/phase-1-ingestion.md) for commands, configuration,
-contracts, failure behavior and a line-by-line reading path. The historical
-simulation roadmap below is retained for context; the phase 1 guide supersedes
-its language and database sequencing decisions.
+```text
+OpenF1 REST
+    ↓
+Python validation + normalization
+    ↓
+SQLite event log + raw archive outbox
+    ↓                         ↓
+replay by log offset      local files or S3
+    ↓
+future Java coordinator
+```
+
+See [the Phase 1 ingestion guide](docs/phase-1-ingestion.md) for commands, configuration, event contracts, ordering rules, archival behavior, and failure boundaries.
 
 ## Simulation demo
 
-Four fictional cars produce telemetry at 10 Hz. A bounded queue feeds one Python
-worker thread, which updates an in-memory race state. A local HTTP API serves a
-small responsive website with standings, a schematic oval, and selected-car
-speed, throttle, brake and gear. The website polls at up to 5 Hz and remembers
-its selected car. Everything is clearly labeled as simulated.
+Four fictional cars produce telemetry at 10 Hz. A bounded queue feeds one Python worker thread, which updates an in-memory race state. A local HTTP API serves a responsive browser UI with standings, a schematic track view, and selected-car telemetry.
 
-**The browser demo is simulated.** Its in-memory state disappears on restart.
-The separate OpenF1 ingestion path uses a durable SQLite log; see the phase 1 guide.
-Java coordinator/workers, Postgres, and a live race dashboard remain future work.
+**The browser demo is simulated.** Its in-memory state disappears on restart. It is separate from the durable OpenF1 ingestion path.
 
-## Run on macOS
+### Run the demo
 
-Python 3.9+ and Git are sufficient. No packages, Node build, database or containers
-are needed for this first slice. From the repository directory:
+Python 3.9+ and Git are sufficient:
 
 ```bash
 python3 -m venv .venv
@@ -41,83 +50,36 @@ source .venv/bin/activate
 python3 -m racestate.server
 ```
 
-Open http://127.0.0.1:8000. Press Ctrl-C to stop. If the port is occupied:
+Open `http://127.0.0.1:8000`.
 
-```bash
-PORT=8001 python3 -m racestate.server
-```
-
-Configuration uses exported environment variables. `.env.example` documents them;
-the app does not automatically load `.env`. Bind to localhost for this development server.
+Run tests with:
 
 ```bash
 python3 -m unittest discover -s tests -v
 ```
 
-## Disciplined MVP
+## Read the code
 
-The distributed MVP is complete at milestone 2:
+For the real-data ingestion path, start here:
 
-- Simulated telemetry passes through bounded work to two worker processes.
-- One authoritative state owner applies validated events and rejects late/duplicate data.
-- Postgres stores replayable raw events and current driver state transactionally.
-- The API reads consistent race snapshots; the browser shows order, position and driver telemetry.
-- A reproducible replay proves ordering, persistence and restart behavior.
+1. `racestate/ingestion/models.py` — typed fields, validation, and stable event identity.
+2. `racestate/ingestion/openf1.py` — OpenF1 requests, response limits, and retries.
+3. `racestate/ingestion/pipeline.py` — normalization, ordering, and commit flow.
+4. `racestate/ingestion/log.py` — SQLite schema, transactions, offsets, and archive queue.
+5. `racestate/ingestion/archive.py` — local/S3 archival and retry behavior.
+6. `racestate/ingestion/config.py` and `__main__.py` — configuration and command wiring.
 
-One session, fictional cars, no auth, predictions, news, radio or real feed in this MVP.
-Target local behavior: 20 simulated cars at 10 events/sec each; state responses under
-100 ms p95 and displayed readings under 500 ms old on a documented test machine.
-These are acceptance targets, **not measured results**. Measure at milestone 1.
+For the simulated browser demo:
 
-## Read the code in this order
+1. `racestate/events.py`
+2. `racestate/simulator.py`
+3. `racestate/state.py`
+4. `racestate/worker.py`
+5. `racestate/server.py`
+6. `web/app.js`
 
-1. `racestate/events.py`: immutable fields, units and validation.
-2. `racestate/simulator.py`: deterministic event generation and backpressure.
-3. `racestate/state.py`: ordering rules, lock and snapshot copies.
-4. `racestate/worker.py`: queue consumption and shutdown.
-5. `racestate/server.py`: wiring, HTTP routes and lifecycle.
-6. `web/app.js`: one polling loop and explicit DOM updates.
+## Project direction
 
-Python handles the first implementation; SQL arrives with Postgres and Bash is
-used for small operational commands. Java or C may be used when they solve a
-specific problem James understands. Do not split into multiple languages just to
-use them. Consider Go only after profiling identifies a service worth replacing.
+The current phase deliberately keeps ingestion local and durable before adding distributed processing. Future work will connect the event log to a Java coordinator, add worker registration and failure handling, and introduce Postgres and DuckDB only when those components are actually implemented and tested.
 
-## Structure
-
-```text
-racestate/                 domain model, simulation, worker, state, server
-web/                       plain HTML/CSS and minimal browser JavaScript
-tests/                     contract, state, queue and HTTP tests
-docs/design-principles.md  constraints for every change
-docs/architecture.md       boundaries, concurrency and migration path
-docs/event-schema.md       wire contract, units, ordering and examples
-docs/roadmap.md            milestones, dependencies and acceptance criteria
-docs/github-plan.json      machine-readable GitHub planning items
-scripts/publish_github.py  create private repo and sync milestones/issues
-.github/workflows/ci.yml   Python test matrix
-```
-
-## GitHub setup
-
-The local repository is ready to commit/push. GitHub creation needs an authenticated
-GitHub CLI (`gh`) and a chosen owner. After restoring login, run:
-
-```bash
-gh auth login -h github.com
-python3 scripts/publish_github.py OWNER/racestate
-```
-
-Replace `OWNER` with your personal username. The script creates a **private**
-repository if missing, checks an existing repository is empty before the first
-push, and creates milestones and issues from `docs/github-plan.json`. It will
-not push to an unrelated existing repository. Reruns skip matching issue and
-milestone titles. Existing issue bodies are not overwritten. Keep planning titles
-stable when rerunning. Public release and licensing are separate decisions.
-
-Use small branches and PRs tied to issues. Each PR should explain the problem,
-changed behavior, how it was verified, and remaining limitations. Read each
-important function before accepting the next architectural addition.
-
-See [the roadmap](docs/roadmap.md), [architecture](docs/architecture.md),
-[event contract](docs/event-schema.md) and [design principles](docs/design-principles.md).
+See the [roadmap](docs/roadmap.md), [architecture](docs/architecture.md), [event contract](docs/event-schema.md), and [design principles](docs/design-principles.md) for more detail.
